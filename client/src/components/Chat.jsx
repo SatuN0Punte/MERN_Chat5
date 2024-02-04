@@ -13,25 +13,26 @@ const Chat = () => {
   const [newMessageText, setNewMessageText] = useState({});
   const { username, id, setUsername, setId } = useContext(UserContext);
 
-  //this useEffect for connectWebSocket
+  // ใน useEffect นี้, ทุกครั้งที่ selectedUserId เปลี่ยนแปลง, จะทำการเชื่อมต่อ WebSocket
   useEffect(() => {
     connectToWs();
   }, [selectedUserId]);
+
+  // connectToWs function ในการเชื่อมต่อ WebSocket
   const connectToWs = () => {
     const ws = new WebSocket("ws://localhost:4000");
     setWs(ws);
-    ws.addEventListener("message", handleMessage); //in this line if someone want to message it will be handleMessage in line 28
+    ws.addEventListener("message", handleMessage);
     ws.addEventListener("close", () => {
       console.log("Disconnected. Trying to reconnect.");
       setTimeout(() => connectToWs(), 1000);
     });
   };
 
-  //this function for message
+  // ใน handleMessage function, ตรวจสอบข้อมูลที่ได้รับจาก WebSocket
   const handleMessage = (e) => {
     const messageData = JSON.parse(e.data);
     if ("online" in messageData) {
-      //this line
       showOnlinePeople(messageData.online);
     } else if ("text" in messageData) {
       if (messageData.sender === selectedUserId) {
@@ -39,39 +40,34 @@ const Chat = () => {
       }
     }
   };
-  const showOnlinePeople = (peopleArray) => {
-    const people = {};
-    peopleArray.forEach(({ userId, username }) => {
-      people[userId] = username;
-    });
-    setOnlinePeople(people);
-  };
 
-  useEffect(() => {
-    axios.get("/people").then((res) => {
-      const offlinePeopleArr = res.data
-        .filter((p) => p._id != id)
-        .filter((p) => !Object.keys(onlinePeople).includes(p._id));
-      const offlinePeople = {};
-      offlinePeopleArr.forEach((p) => {
-        offlinePeople[p._id] = p;
-      });
-      console.log("offline people");
-      setOfflinePeople(offlinePeople);
-    });
-  }, [onlinePeople]);
+  // ใน JSX, ใช้ Object.keys และ map เพื่อแสดงผล Online และ Offline People
+  {
+    Object.keys(onlinePeople).map((userId) => (
+      <Contact
+        key={userId}
+        username={onlinePeople[userId]}
+        id={userId}
+        online={true}
+        selected={userId === selectedUserId}
+        onClick={() => setSelectedUserId(userId)}
+      />
+    ));
+  }
+  {
+    Object.keys(offlinePeople).map((userId) => (
+      <Contact
+        key={userId}
+        username={offlinePeople[userId].username}
+        id={userId}
+        online={false}
+        selected={userId === selectedUserId}
+        onClick={() => setSelectedUserId(userId)}
+      />
+    ));
+  }
 
-  const onlinePeopleExclOurUser = { ...onlinePeople };
-  delete onlinePeopleExclOurUser[id];
-
-  const logout = () => {
-    axios.post("/logout").then(() => {
-      setWs(null);
-      setId(null);
-      setUsername(null);
-    });
-  };
-
+  // ใน sendMessage function, ส่งข้อความหรือไฟล์ผ่าน WebSocket
   const sendMessage = (e, file = null) => {
     if (e) e.preventDefault();
     ws.send(
@@ -98,6 +94,8 @@ const Chat = () => {
       ]);
     }
   };
+
+  // ใน useEffect, ในกรณีที่มี selectedUserId, ดึงข้อมูลการสนทนาจากเซิร์ฟเวอร์
   useEffect(() => {
     if (selectedUserId) {
       axios.get("/messages/" + selectedUserId).then((res) => {
@@ -106,6 +104,7 @@ const Chat = () => {
     }
   }, [selectedUserId]);
 
+  // ใน JSX, แสดงผลข้อความที่ได้รับ โดยไม่แสดงข้อความที่ซ้ำกัน
   const messageWithoutDups = uniqBy(message, "_id");
 
   const sendFile = (e) => {
@@ -116,7 +115,6 @@ const Chat = () => {
     };
   };
 
- 
   return (
     <div className="flex h-screen">
       <div className="bg-gray-200 w-1/3 flex flex-col">
@@ -171,9 +169,7 @@ const Chat = () => {
         <div className="flex-grow">
           {!selectedUserId && (
             <div className="flex h-full flex-grow items-center justify-center">
-              <div className="text-gray-300">
-                &larr; เลือกผู้คนแชทกันเถอะ"_"
-              </div>
+              <div className="text-gray-300">&larr; โปรดเลือกแชท</div>
             </div>
           )}
           {!!selectedUserId && (
@@ -205,7 +201,7 @@ const Chat = () => {
                               message.file
                             }
                             alt="File"
-                            className="max-w-64 h-auto max-h-64" // ปรับขนาดตามความต้องการ
+                            className="max-w-64 h-auto max-h-64"
                           />
                           <a
                             href={
@@ -248,7 +244,7 @@ const Chat = () => {
             className="bg-white flex-grow border rounded-lg p-2"
           />
           <label className="bg-blue-200 p-2 text-gray-600 cursor-pointer rounded-xl border-blue-200">
-            <input type="file" className="hidden" onChange={sendFile}/>
+            <input type="file" className="hidden" onChange={sendFile} />
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
